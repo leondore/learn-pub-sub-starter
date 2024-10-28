@@ -3,10 +3,9 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
-	"syscall"
 
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
+	"github.com/bootdotdev/learn-pub-sub-starter/internal/routing"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -21,11 +20,24 @@ func main() {
 	}
 	defer conn.Close()
 
-	fmt.Println("connection to RabbitMQ server was successful")
+	fmt.Println("Peril game server successfully connected to RabbitMQ")
 
-	// Wait for user termination signal
-	shutdown := make(chan os.Signal, 1)
-	signal.Notify(shutdown, syscall.SIGINT, syscall.SIGTERM)
-	<-shutdown
-	fmt.Println("closing connection to RabbitMQ server")
+	ch, err := conn.Channel()
+	if err != nil {
+		log.Fatalf("could not open a channel: %v", err)
+	}
+
+	err = pubsub.PublishJSON(
+		ch,
+		routing.ExchangePerilDirect,
+		routing.PauseKey,
+		routing.PlayingState{
+			IsPaused: true,
+		},
+	)
+	if err != nil {
+		log.Fatalf("error sending message: %v", err)
+	}
+
+	fmt.Println("Pause message sent")
 }
