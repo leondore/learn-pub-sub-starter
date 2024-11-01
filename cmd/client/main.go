@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"log"
-	"os"
-	"os/signal"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -22,7 +20,6 @@ func main() {
 		log.Fatalf("could not connect to RabbitMQ: %v", err)
 	}
 	defer conn.Close()
-
 	fmt.Println("Peril game client successfully connected to RabbitMQ")
 
 	username, err := gamelogic.ClientWelcome()
@@ -30,20 +27,49 @@ func main() {
 		log.Fatalf("error getting username: %v", err)
 	}
 
-	_, queue, err := pubsub.DeclareAndBind(
+	gs := gamelogic.NewGameState(username)
+	err = pubsub.SubscribeJSON(
 		conn,
 		routing.ExchangePerilDirect,
-		fmt.Sprintf("%s.%s", routing.PauseKey, username),
+		fmt.Sprintf("%s.%s", routing.PauseKey, gs.GetUsername()),
 		routing.PauseKey,
 		pubsub.Transient,
+		handlerPause(gs),
 	)
 	if err != nil {
 		log.Fatalf("could not subscribe to exchange: %v", err)
 	}
-	fmt.Printf("Queue %v declared and bound!\n", queue.Name)
 
-	// wait for ctrl+c
-	signalChan := make(chan os.Signal, 1)
-	signal.Notify(signalChan, os.Interrupt)
-	<-signalChan
+	for {
+		words := gamelogic.GetInput()
+		if len(words) == 0 {
+			continue
+		}
+
+		switch words[0] {
+		case "spawn":
+			err = gs.CommandSpawn(words)
+			if err != nil {
+				log.Printf("error spawning unit: %v", err)
+				continue
+			}
+		case "move":
+			_, err := gs.CommandMove(words)
+			if err != nil {
+				log.Printf("could not move unit: %v", err)
+				continue
+			}
+		case "status":
+			gs.CommandStatus()
+		case "help":
+			gamelogic.PrintClientHelp()
+		case "spam":
+			fmt.Println("Spamming not allowed yet!")
+		case "quit":
+			gamelogic.PrintQuit()
+			return
+		default:
+			fmt.Println("command not found")
+		}
+	}
 }

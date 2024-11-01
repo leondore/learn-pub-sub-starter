@@ -29,7 +29,17 @@ func main() {
 		log.Fatalf("could not open a channel: %v", err)
 	}
 
-Game:
+	_, _, err = pubsub.DeclareAndBind(
+		conn,
+		routing.ExchangePerilTopic,
+		routing.GameLogSlug,
+		fmt.Sprintf("%s.*", routing.GameLogSlug),
+		pubsub.Durable,
+	)
+	if err != nil {
+		log.Fatalf("error declaring queue: %v", err)
+	}
+
 	for {
 		words := gamelogic.GetInput()
 		if len(words) == 0 {
@@ -49,9 +59,8 @@ Game:
 				},
 			)
 			if err != nil {
-				log.Fatalf("error sending pause message: %v", err)
+				log.Printf("error sending pause message: %v", err)
 			}
-			break Game
 
 		case "resume":
 			fmt.Println("Resuming the game")
@@ -65,13 +74,12 @@ Game:
 				},
 			)
 			if err != nil {
-				log.Fatalf("error sending pause message: %v", err)
+				log.Printf("error sending pause message: %v", err)
 			}
-			break Game
 
 		case "quit":
 			fmt.Println("Exiting the game")
-			break Game
+			return
 
 		default:
 			fmt.Println("command not found")
