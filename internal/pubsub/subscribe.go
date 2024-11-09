@@ -86,13 +86,13 @@ func SubscribeJSON[T any](
 			switch ackType {
 			case Ack:
 				msg.Ack(false)
-				fmt.Println("Acked")
+
 			case NackRequeue:
 				msg.Nack(false, true)
-				fmt.Println("Nacked and requeued")
+
 			case NackDiscard:
 				msg.Nack(false, false)
-				fmt.Println("Nacked and discarded")
+
 			}
 		}
 	}()

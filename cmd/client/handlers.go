@@ -41,7 +41,7 @@ func handlerArmyMoves(gs *gamelogic.GameState, ch *amqp.Channel) func(mv gamelog
 				return pubsub.NackRequeue
 			}
 
-			return pubsub.NackRequeue
+			return pubsub.Ack
 		}
 
 		fmt.Println("unexpected outcome")
