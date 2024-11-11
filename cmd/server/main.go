@@ -29,15 +29,16 @@ func main() {
 		log.Fatalf("could not open a channel: %v", err)
 	}
 
-	_, _, err = pubsub.DeclareAndBind(
+	err = pubsub.SubscribeGob(
 		conn,
 		routing.ExchangePerilTopic,
 		routing.GameLogSlug,
 		fmt.Sprintf("%s.*", routing.GameLogSlug),
 		pubsub.Durable,
+		handlerLogs(),
 	)
 	if err != nil {
-		log.Fatalf("error declaring queue: %v", err)
+		log.Fatalf("could not starting consuming logs: %v", err)
 	}
 
 	for {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/gamelogic"
 	"github.com/bootdotdev/learn-pub-sub-starter/internal/pubsub"
@@ -49,20 +50,45 @@ func handlerArmyMoves(gs *gamelogic.GameState, ch *amqp.Channel) func(mv gamelog
 	}
 }
 
-func handlerWar(gs *gamelogic.GameState) func(rw gamelogic.RecognitionOfWar) pubsub.AckType {
+func handlerWar(gs *gamelogic.GameState, ch *amqp.Channel) func(rw gamelogic.RecognitionOfWar) pubsub.AckType {
 	return func(rw gamelogic.RecognitionOfWar) pubsub.AckType {
 		defer fmt.Print("> ")
-		outcome, _, _ := gs.HandleWar(rw)
+		outcome, winner, loser := gs.HandleWar(rw)
+
 		switch outcome {
 		case gamelogic.WarOutcomeNotInvolved:
 			return pubsub.NackRequeue
 		case gamelogic.WarOutcomeNoUnits:
 			return pubsub.NackDiscard
-		case gamelogic.WarOutcomeYouWon:
-			return pubsub.Ack
-		case gamelogic.WarOutcomeOpponentWon:
+		case gamelogic.WarOutcomeYouWon, gamelogic.WarOutcomeOpponentWon:
+			err := pubsub.PublishGob(
+				ch,
+				routing.ExchangePerilTopic,
+				fmt.Sprintf("%s.%s", routing.GameLogSlug, rw.Attacker.Username),
+				routing.GameLog{
+					CurrentTime: time.Now(),
+					Username:    gs.GetUsername(),
+					Message:     fmt.Sprintf("%s won a war against %s", winner, loser),
+				},
+			)
+			if err != nil {
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		case gamelogic.WarOutcomeDraw:
+			err := pubsub.PublishGob(
+				ch,
+				routing.ExchangePerilTopic,
+				fmt.Sprintf("%s.%s", routing.GameLogSlug, rw.Attacker.Username),
+				routing.GameLog{
+					CurrentTime: time.Now(),
+					Username:    gs.GetPlayerSnap().Username,
+					Message:     fmt.Sprintf("A war between %s and %s resulted in a draw", winner, loser),
+				},
+			)
+			if err != nil {
+				return pubsub.NackRequeue
+			}
 			return pubsub.Ack
 		}
 
